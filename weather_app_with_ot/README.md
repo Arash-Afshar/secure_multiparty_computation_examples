@@ -1,5 +1,8 @@
 # Demostration of libOTe
 
+This is the code sample created at the end of https://arash-afshar.github.io/oblivious-transfer/ to show how a simple OT
+works.
+
 - Build with `docker build -t weather_ot_test -f Dockerfile .`
 - Run by
     1. `docker run --rm -it weather_ot_test`
