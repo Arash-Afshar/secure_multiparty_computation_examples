@@ -4,38 +4,42 @@
 #include <cryptoTools/Network/Session.h>
 #include <cryptoTools/Network/IOService.h>
 #include <cryptoTools/Crypto/PRNG.h>
-#include <libOTe/TwoChooseOne/IknpOtExtReceiver.h>
-#include <libOTe/TwoChooseOne/IknpOtExtSender.h>
+#include <libOTe/NChooseOne/Kkrt/KkrtNcoOtReceiver.h>
 
 using namespace osuCrypto;
 
 // The following is a modified version of the example in https://github.com/osu-crypto/libOTe
 int main(int argc, char** argv)
 {
-    // Setup networking. See cryptoTools\frontend_cryptoTools\Tutorials\Network.cpp
+    u64 numOTs = 1;
+    auto numChosenMsgs = 10;
+
+    // get up the networking
     IOService ios;
     Channel recverChl = Session(ios, "localhost:1212", SessionMode::Client).addChannel();
+    PRNG prng(sysRandomSeed());
 
-    // The number of OTs.
-    int n = 1;
+    KkrtNcoOtReceiver recver;
 
-    // The code to be run by the OT receiver.
-    auto recverThread = std::thread([&]() {
-        PRNG prng(sysRandomSeed());
-        IknpOtExtReceiver recver;
-        recver.genBaseOts(prng, recverChl);
+    // all Nco Ot extenders must have configure called first. This determines
+    // a variety of parameters such as how many base OTs are required.
+    bool maliciousSecure = false;
+    bool statSecParam = 40;
+    bool inputBitCount = 128;
+    recver.configure(maliciousSecure, statSecParam, inputBitCount);
 
-        // Choose which messages should be received.
-        BitVector choices(n);
-        choices[0] = atoi(argv[1]);
+    // Generate new base OTs for the first extender.
+    recver.genBaseOts(prng, recverChl);
 
-        // Receive the messages
-        std::vector<block> messages(n);
-        recver.receiveChosen(choices, messages, prng, recverChl);
+    std::vector<block>recvMsgs(numOTs);
+    std::vector<u64> choices(numOTs);
 
-        std::cout << "User: Chose city " << choices[0] << " and got " << messages[0] << std::endl;
-    });
+    // define which messages the receiver should learn.
+    for (u64 i = 0; i < numOTs; ++i)
+        choices[i] = atoi(argv[1]);
 
-    recverThread.join();
-    return 0;
+    // the messages that were learned are written to recvMsgs.
+    recver.receiveChosen(numChosenMsgs, recvMsgs, choices, prng, recverChl);
+    
+    std::cout << "Client: chosen city " << choices[0] << ", got temperature " << recvMsgs[0] << std::endl;
 }
